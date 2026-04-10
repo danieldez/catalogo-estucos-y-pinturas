@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Package } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import CategoryFilter from "@/components/CategoryFilter";
@@ -7,7 +7,7 @@ import FloatingCartButton from "@/components/FloatingCartButton";
 import CartDrawer from "@/components/CartDrawer";
 import { useProducts } from "@/hooks/useProducts";
 import { useCart } from "@/hooks/useCart";
-import { fuzzyMatch } from "@/lib/fuzzySearch";
+import { strictMatch } from "@/lib/fuzzySearch";
 
 export default function Index() {
   const [search, setSearch] = useState("");
@@ -17,10 +17,23 @@ export default function Index() {
   const { products, categories, loading } = useProducts("https://docs.google.com/spreadsheets/d/e/2PACX-1vScUHsWzn2rzFJQMHSd_Qz4v5vSq69E0ERGb1z9h4mU4rcdp0OrASIrH1F_5_9rfvOAuN4rrdP-yzHG/pub?gid=0&single=true&output=csv");
   const cart = useCart();
 
+  // Reset de estado: al cambiar categoría, limpiar búsqueda
+  const handleCategorySelect = useCallback((cat: string | null) => {
+    setSearch("");
+    setSelectedCategory(cat);
+  }, []);
+
+  // Filtro estricto + deduplicación por ID
   const filteredProducts = useMemo(() => {
+    const seen = new Set<string>();
     return products.filter((p) => {
+      // Prevención de duplicados: si ya vimos este ID, lo saltamos
+      if (seen.has(p.id)) return false;
+      seen.add(p.id);
+      // Filtro por categoría
       if (selectedCategory && p.categoria !== selectedCategory) return false;
-      if (search && !fuzzyMatch(`${p.nombre} ${p.categoria}`, search)) return false;
+      // Filtro estricto de búsqueda (insensible a mayúsculas y tildes)
+      if (search && !strictMatch(`${p.nombre} ${p.categoria}`, search)) return false;
       return true;
     });
   }, [products, search, selectedCategory]);
@@ -54,7 +67,7 @@ export default function Index() {
           {/* Buscador y Filtros */}
           <div className="space-y-3">
             <SearchBar value={search} onChange={setSearch} />
-            <CategoryFilter categories={categories} selected={selectedCategory} onSelect={setSelectedCategory} />
+            <CategoryFilter categories={categories} selected={selectedCategory} onSelect={handleCategorySelect} />
           </div>
         </div>
       </header>

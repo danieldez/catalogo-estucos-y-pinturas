@@ -1,28 +1,35 @@
-export function fuzzyMatch(text: string, query: string): boolean {
-  const normalize = (s: string) =>
-    s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, "");
-
-  const normalizedText = normalize(text);
-  const normalizedQuery = normalize(query);
-  const words = normalizedQuery.split(/\s+/).filter(Boolean);
-
-  return words.every((word) => {
-    if (normalizedText.includes(word)) return true;
-    // Simple Levenshtein-based tolerance for short words
-    const textWords = normalizedText.split(/\s+/);
-    return textWords.some((tw) => levenshtein(tw, word) <= Math.max(1, Math.floor(word.length / 3)));
-  });
+/**
+ * Normaliza un string removiendo acentos/tildes y convirtiendo a minúsculas.
+ * Esto permite búsquedas insensibles a mayúsculas y acentos.
+ */
+function normalize(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
 }
 
-function levenshtein(a: string, b: string): number {
-  const m = a.length, n = b.length;
-  const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
-    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
-  );
-  for (let i = 1; i <= m; i++)
-    for (let j = 1; j <= n; j++)
-      dp[i][j] = a[i - 1] === b[j - 1]
-        ? dp[i - 1][j - 1]
-        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
-  return dp[m][n];
+/**
+ * Filtro estricto de búsqueda.
+ * Retorna `true` SOLO si el texto contiene TODOS los términos del query.
+ * No usa Levenshtein ni tolerancia difusa para evitar resultados irrelevantes.
+ * - Insensible a mayúsculas/minúsculas
+ * - Insensible a tildes/acentos (é → e, ñ → n, etc.)
+ */
+export function strictMatch(text: string, query: string): boolean {
+  const normalizedText = normalize(text);
+  const words = normalize(query).split(/\s+/).filter(Boolean);
+
+  if (words.length === 0) return true;
+
+  return words.every((word) => normalizedText.includes(word));
+}
+
+/**
+ * @deprecated Usar `strictMatch` en su lugar. Esta función usa Levenshtein
+ * con tolerancia excesiva que genera resultados irrelevantes.
+ */
+export function fuzzyMatch(text: string, query: string): boolean {
+  return strictMatch(text, query);
 }
